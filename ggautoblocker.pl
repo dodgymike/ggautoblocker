@@ -1,6 +1,7 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 
 use strict;
+use warnings;
 
 use Net::Twitter;
 
@@ -44,21 +45,17 @@ sub get_rate_limit {
 
 	my $m = $nt->rate_limit_status;
 
-		if ( $m->{'resources'}->{'application'}->{'/application/rate_limit_status'}->{'remaining'} == 0 ) {
-			print " -- API limit reached, waiting for ". ( $m->{'resources'}->{'application'}->{'/application/rate_limit_status'}->{'reset'} - time ) . " seconds --\n" if $debug;
-		sleep ( $m->{'resources'}->{'application'}->{'/application/rate_limit_status'}->{'reset'} - time + 1 );
+	my $rate_limit_status = $m->{'resources'}{'application'}{'/application/rate_limit_status'};
+	if ( $rate_limit_status->{'remaining'} == 0 ) {
+		my $sleep_time = $rate_limit_status->{'reset'} - time + 1;
+		print " -- API limit reached, waiting for ($sleep_time) seconds --\n" if $debug;
+		sleep $sleep_time;
 	}
 
 	if ( $type =~ /followers/ ) {
-		return { 
-			remaining => $m->{'resources'}->{'followers'}->{'/followers/ids'}->{'remaining'}, 
-			reset => $m->{'resources'}->{'followers'}->{'/followers/ids'}->{'reset'} 
-		};
+		return { map { $_ => $m->{'resources'}{'followers'}{'/followers/ids'}{$_} } qw/remaining reset/ };
 	} elsif ( $type =~ /lookup_users/ ) {
-		return {
-			remaining => $m->{'resources'}->{'users'}->{'/users/lookup'}->{'remaining'},
-			reset => $m->{'resources'}->{'users'}->{'/users/lookup'}->{'reset'}
-		};
+		return { map { $_ => $m->{'resources'}{'users'}{'/users/lookup'}{$_} } qw/remaining reset/ };
 	}
 }
 
@@ -70,8 +67,9 @@ sub wait_for_rate_limit {
 	my $limit = get_rate_limit($type);
 
 	if ( $limit->{'remaining'} == 0 ) {
-		print " -- API limit reached, waiting for ". ( $limit->{'reset'} - time ) . " seconds --\n" if $debug;
-		sleep ( $limit->{'reset'} - time + 1 );
+		my $wait_time = $limit->{'reset'} - time + 1;
+		print " -- API limit reached, waiting for ($wait_time) seconds --\n" if $debug;
+		sleep $wait_time;
 	}
 }
 
@@ -152,7 +150,7 @@ close B;
 
 
 print "This is going to take a while, because API limits are dumb.\n\n";
-$| = 1;
+$|++;
 
 
 # first, get a list of the IDs of all the problem children. 
